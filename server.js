@@ -21,10 +21,11 @@ const rateLimit = require("express-rate-limit");
 const admin = require("./middleware/admin");
 const allowRoles = require("./middleware/roles");
 const app = express();
-const http = require("http").createServer(app);
+const http = require("http");
+const server = http.createServer(app);
 const { Server } = require("socket.io");
 const generatePDF = require("./utils/generateInvoice");
-const io = new Server(http, {
+const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
@@ -1580,6 +1581,6 @@ app.use((err, req, res, next) => {
     message: err.message || "Internal Server Error"
   });
 });
-http.listen(process.env.PORT || 5000, () => {
+server.listen(process.env.PORT || 5000, () => {
   console.log("🚀 FULL CRM SERVER RUNNING");
 });
