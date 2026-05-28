@@ -25,7 +25,11 @@ const http = require("http").createServer(app);
 const { Server } = require("socket.io");
 const generatePDF = require("./utils/generateInvoice");
 const io = new Server(http, {
-  cors: { origin: "*" }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
 });
 app.set("io", io);
 io.on("connection", (socket) => {
@@ -46,8 +50,10 @@ app.use((req, res, next) => {
   next();
 });
 app.use(morgan("dev"));
+
 app.use(cors({
-  origin: true,
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 app.use(rateLimit({
@@ -533,9 +539,109 @@ router.get("/activity", auth, async (req, res) => {
   }
 });
 // ================= COMPANY =================
-router.post("/company", async (req, res) => {
-  const company = await Company.create(req.body);
-  res.json({ success: true, company });
+router.post(
+  "/company",
+  upload.single("logo"),
+  async (req, res) => {
+
+    try {
+
+      const {
+        name,
+        email,
+        phone,
+        businessType,
+        username,
+        password
+      } = req.body;
+
+      // ✅ REQUIRED VALIDATION
+      if (
+        !name ||
+        !email ||
+        !phone ||
+        !businessType ||
+        !username ||
+        !password
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "All fields required"
+        });
+      }
+
+      // ✅ CHECK EXISTING USER
+      const existing = await User.findOne({
+        email
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already exists"
+        });
+      }
+
+      // ✅ HASH PASSWORD
+      const hashed =
+        await bcrypt.hash(password, 10);
+
+      // ✅ CREATE COMPANY
+      const company =
+        await Company.create({
+          name,
+          email,
+          phone,
+          businessType,
+          logo: req.file
+            ? req.file.filename
+            : null
+        });
+
+      // ✅ CREATE ADMIN USER
+      const user =
+        await User.create({
+          name,
+          email,
+          password: hashed,
+          username,
+          role: "admin",
+          companyId: company._id
+        });
+
+      // ✅ UPDATE OWNER
+      company.owner = user._id;
+
+      await company.save();
+
+      // ✅ TOKEN
+      const token = jwt.sign(
+        {
+          id: user._id,
+          companyId: company._id,
+          role: user.role
+        },
+        process.env.JWT_SECRET
+      );
+
+      res.json({
+        success: true,
+        company,
+        user,
+        token
+      });
+
+    } catch (err) {
+
+      console.log(err);
+
+      res.status(500).json({
+        success: false,
+        message: err.message
+      });
+
+    }
+
 });
 
 router.get("/company", auth, async (req, res) => {
@@ -1338,7 +1444,7 @@ router.post("/invoices", auth, async (req, res) => {
     });
   }
 });
-router.post("/invoices/:id/payments", auth, async (req, res) => {
+router.post("/invoices/:id/payment", auth, async (req, res) => {
   try {
     const invoice = await Invoice.findOne({
       _id: req.params.id,
