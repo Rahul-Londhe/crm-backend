@@ -21,10 +21,13 @@ const rateLimit = require("express-rate-limit");
 const admin = require("./middleware/admin");
 const allowRoles = require("./middleware/roles");
 const app = express();
+
+const generatePDF = require("./utils/generateInvoice");
 const http = require("http");
 const server = http.createServer(app);
+
 const { Server } = require("socket.io");
-const generatePDF = require("./utils/generateInvoice");
+
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -32,7 +35,11 @@ const io = new Server(server, {
     credentials: true
   }
 });
+
+// app set io
 app.set("io", io);
+
+// ================= SOCKET CONNECTION =================
 io.on("connection", (socket) => {
   console.log("User Connected:", socket.id);
 
@@ -395,48 +402,51 @@ router.post("/auth/login", async (req, res) => {
   try {
     let { email, password } = req.body;
 
-    email = email.toLowerCase().trim();
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email/password missing"
+      });
+    }
 
-    console.log("LOGIN BODY:", req.body);
+    email = email.toLowerCase().trim();
 
     const user = await User.findOne({ email });
 
-if (!user) {
-  return res.status(400).json({
-    success: false,
-    message: "User not found"
-  });
-}
+    console.log("USER FOUND:", user);
 
-const match = await bcrypt.compare(password, user.password);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
 
-if (!match) {
-  return res.status(400).json({
-    success: false,
-    message: "Wrong password"
-  });
-}
+    const match = await bcrypt.compare(password, user.password);
 
-// ✅ CREATE TOKEN HERE
-const token = jwt.sign({
-  id: user._id,
-  name: user.name,
-  companyId: user.companyId.toString(),
-  role: user.role
-}, process.env.JWT_SECRET);
-res.json({
-  success: true,
-  user: {
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    companyId: user.companyId
-  },
-  token
-});
+    console.log("PASSWORD MATCH:", match);
+
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        message: "Wrong password"
+      });
+    }
+
+    const token = jwt.sign({
+      id: user._id,
+      companyId: user.companyId.toString(),
+      role: user.role
+    }, process.env.JWT_SECRET);
+
+    return res.json({
+      success: true,
+      user,
+      token
+    });
 
   } catch (err) {
+    console.error("LOGIN ERROR:", err);
     res.status(500).json({
       success: false,
       message: err.message
@@ -540,11 +550,7 @@ router.get("/activity", auth, async (req, res) => {
   }
 });
 // ================= COMPANY =================
-router.post(
-  "/company",
-  upload.single("logo"),
-  async (req, res) => {
-
+router.post("/company", auth, upload.single("logo"), async (req, res) => {
     try {
 
       const {
