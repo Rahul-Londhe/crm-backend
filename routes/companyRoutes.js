@@ -1,123 +1,84 @@
 const express = require("express");
 const router = express.Router();
 
-const multer = require("multer");
-
 const Company = require("../models/Company");
-
-// ================= MULTER =================
-
-const storage = multer.memoryStorage();
-
-const upload = multer({
-  storage,
-});
 
 // ================= CREATE COMPANY =================
 
-router.post(
-  "/",
-  upload.single("logo"),
-  async (req, res) => {
+router.post("/", async (req, res) => {
+try {
 
-    try {
+const {
+  name,
+  email,
+  phone,
+  address,
+  plan
+} = req.body;
 
-      // ================= CHECK BODY =================
+if (!name) {
+  return res.status(400).json({
+    success: false,
+    message: "Company name required"
+  });
+}
 
-      if (!req.body) {
-        return res.status(400).json({
-          success: false,
-          message: "Form data missing",
-        });
-      }
+const company = await Company.create({
+  name,
+  email,
+  phone,
+  address,
+  plan: plan || "Free"
+});
 
-      // ================= GET DATA =================
+res.json({
+  success: true,
+  company
+});
 
-      const {
-        name,
-        email,
-        phone,
-        companyName,
-        businessType,
-        username,
-        password,
-      } = req.body;
 
-      // ================= VALIDATION =================
+} catch (err) {
 
-      if (
-        !name ||
-        !email ||
-        !phone ||
-        !companyName ||
-        !businessType ||
-        !username ||
-        !password
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "All fields are required",
-        });
-      }
 
-      // ================= CREATE =================
+console.error(err);
 
-      const company = await Company.create({
-        name,
-        email,
-        phone,
-        companyName,
-        businessType,
-        username,
-        password,
+res.status(500).json({
+  success: false,
+  message: err.message
+});
 
-        logo:
-          req.file
-            ? req.file.originalname
-            : "",
-      });
 
-      // ================= SUCCESS =================
-
-      res.json({
-        success: true,
-        message: "Company created successfully",
-        company,
-      });
-
-    } catch (err) {
-
-      console.error("CREATE COMPANY ERROR:", err);
-
-      res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
-  }
-);
+}
+});
 
 // ================= GET ALL =================
 
 router.get("/", async (req, res) => {
 
-  try {
+try {
 
-    const companies =
-      await Company.find().populate("owner");
 
-    res.json({
-      success: true,
-      companies,
-    });
+const companies =
+  await Company.find()
+  .populate("owner");
 
-  } catch (err) {
+res.json({
+  success: true,
+  companies
+});
 
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
+
+} catch (err) {
+
+
+res.status(500).json({
+  success: false,
+  message: err.message
+});
+
+
+}
+
 });
 
 module.exports = router;

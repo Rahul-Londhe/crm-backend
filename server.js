@@ -26,31 +26,11 @@ const generatePDF = require("./utils/generateInvoice");
 const http = require("http");
 const server = http.createServer(app);
 
-const { Server } = require("socket.io");
 
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
+const { initSocket, getIO } = require("./socket");
 
-// app set io
-app.set("io", io);
 
-// ================= SOCKET CONNECTION =================
-io.on("connection", (socket) => {
-  console.log("User Connected:", socket.id);
-
-  socket.on("joinCompany", (companyId) => {
-    socket.join(companyId);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("User Disconnected:", socket.id);
-  });
-});
+//app.set("io", io);
 // ================= MIDDLEWARE =================
 app.use(express.json());
 app.use((req, res, next) => {
@@ -59,11 +39,20 @@ app.use((req, res, next) => {
 });
 app.use(morgan("dev"));
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
+
+
+const corsOptions = {
+  origin: [
+    "http://localhost:8080",
+    "https://your-frontend-domain.com"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+};
+
+app.use(cors(corsOptions));
+
+
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5000, // increase limit
@@ -410,8 +399,10 @@ router.post("/auth/login", async (req, res) => {
     }
 
     email = email.toLowerCase().trim();
-
-    const user = await User.findOne({ email });
+console.log("EMAIL RECEIVED:", email);
+    const user = await User.findOne({
+  email: { $regex: new RegExp("^" + email.trim() + "$", "i") }
+});
 
     console.log("USER FOUND:", user);
 
@@ -501,38 +492,29 @@ router.put(
 );
 router.put(
   "/make-admin/:id",
+  auth,
+  admin,
   async (req, res) => {
+  try {
 
-    try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role: "admin" },
+      { new: true }
+    );
 
-      const user =
-        await User.findByIdAndUpdate(
+    res.json({
+      success: true,
+      user
+    });
 
-          req.params.id,
+  } catch (err) {
 
-          {
-            role: "admin"
-          },
+    res.status(500).json({
+      success: false
+    });
 
-          {
-            new: true
-          }
-
-        );
-
-      res.json({
-        success: true,
-        user
-      });
-
-    } catch (err) {
-
-      res.status(500).json({
-        success: false
-      });
-
-    }
-
+  }
 });
 // ================= ACTIVITY =================
 router.get("/activity", auth, async (req, res) => {
