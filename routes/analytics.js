@@ -68,12 +68,8 @@ function Analytics() {
 
   // ================= LOAD =================
   useEffect(() => {
-    fetchData();
-
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
+  fetchData();
+}, [fetchData]);
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
   if (loading) return <h2>Loading Analytics...</h2>;
@@ -81,7 +77,21 @@ function Analytics() {
   return (
     <div style={{ padding: "20px" }}>
       <h2>📊 Advanced Analytics Dashboard</h2>
-
+<div style={{ marginBottom: "20px" }}>
+  <button
+    onClick={fetchData}
+    style={{
+      padding: "10px 20px",
+      background: "#2563eb",
+      color: "#fff",
+      border: "none",
+      borderRadius: "5px",
+      cursor: "pointer"
+    }}
+  >
+    🔄 Refresh Analytics
+  </button>
+</div>
       {/* YEAR FILTER */}
       <div style={{ marginBottom: "20px" }}>
         <label>Select Year: </label>

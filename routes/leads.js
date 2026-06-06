@@ -3,11 +3,13 @@ const mongoose = require("mongoose");
 const router = express.Router();
 const Lead = require("../models/Lead");
 const LeadNote = require("../models/LeadNote");
+const Activity = require("../models/Activity");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const runLeadAutomation =
 require("../automation/leadAutomation");
+const auth = require("../middleware/auth"); // if exists
 // ================= UPLOAD PATH =================
 const uploadDir = path.join(__dirname, "../uploads");
 
@@ -41,9 +43,13 @@ const getCompanyFilter = (req) => {
 };
 
 // ================= GET ALL =================
-router.get("/", async (req, res) => {
+router.get("/", auth, async (req, res) => {
   try {
-    const leads = await Lead.find(getCompanyFilter(req))
+    const user = getUser(req);
+
+    const leads = await Lead.find({
+      companyId: new mongoose.Types.ObjectId(user.companyId)
+    })
       .populate("assignedTo", "name email")
       .sort({ createdAt: -1 });
 
@@ -53,7 +59,10 @@ router.get("/", async (req, res) => {
     console.error("GET ERROR:", err);
 
     if (err.message === "UNAUTHORIZED") {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
     }
 
     res.status(500).json({ success: false, message: err.message });
@@ -67,37 +76,27 @@ router.post("/", upload.single("file"), async (req, res) => {
 
     const lead = await Lead.create({
       ...req.body,
-      value: req.body.value ? Number(req.body.value) : 0,
+      value: req.body.value ? Number(req.body.value) : undefined,
       user: user.id,
-      companyId: new mongoose.Types.ObjectId(user.companyId),
-      file: req.file ? req.file.filename : ""
+      companyId: user.companyId,
+      file: req.file?.filename || ""
     });
-await runLeadAutomation(
-  lead,
-  req.user,
-  req.app.get("io")
-);
-    const populated = await Lead.findById(lead._id)
+
+    await Activity.create({
+      action: `Lead Created: ${lead.name}`,
+      user: req.user.name || "User",
+      companyId: req.user.companyId
+    });
+
+    await runLeadAutomation(lead, req.user, req.app.get("io"));
+
+    const result = await Lead.findById(lead._id)
       .populate("assignedTo", "name email");
 
-    res.json({ success: true, lead: populated });
+    res.json({ success: true, lead: result });
 
   } catch (err) {
-    console.error("CREATE ERROR:", err);
-
-    if (err.message === "DUPLICATE_PHONE") {
-      return res.status(400).json({
-        success: false,
-        message: "Phone already exists"
-      });
-    }
-
-    if (err.message === "UNAUTHORIZED") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized"
-      });
-    }
+    console.log("CREATE ERROR:", err);
 
     res.status(500).json({
       success: false,
@@ -105,7 +104,6 @@ await runLeadAutomation(
     });
   }
 });
-
 // ================= UPDATE =================
 router.put("/:id", upload.single("file"), async (req, res) => {
   try {
@@ -113,112 +111,36 @@ router.put("/:id", upload.single("file"), async (req, res) => {
 
     const updateData = {
       ...req.body,
-      user: user.id
+      user: user.id,
+      value: req.body.value ? Number(req.body.value) : undefined,
     };
 
-    if (req.body.value) {
-      updateData.value = Number(req.body.value);
-    }
-
-    if (req.file) {
-      updateData.file = req.file.filename;
-    }
+    if (req.file) updateData.file = req.file.filename;
 
     const lead = await Lead.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        ...getCompanyFilter(req)
-      },
+      { _id: req.params.id, companyId: new mongoose.Types.ObjectId(req.user.companyId) },
       updateData,
       { new: true }
     ).populate("assignedTo", "name email");
 
     if (!lead) {
-      return res.status(404).json({
-        success: false,
-        message: "Lead not found"
-      });
+      return res.status(404).json({ success: false, message: "Lead not found" });
     }
+
+    await Activity.create({
+      action: `Lead Updated: ${lead.name}`,
+      user: req.user.name || "User",
+      companyId: req.user.companyId
+    });
 
     res.json({ success: true, lead });
 
   } catch (err) {
-    console.error("UPDATE ERROR:", err);
-
-    if (err.message === "DUPLICATE_PHONE") {
-      return res.status(400).json({
-        success: false,
-        message: "Phone already exists"
-      });
-    }
-
-    if (err.message === "UNAUTHORIZED") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized"
-      });
-    }
-
+    console.log(err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
 // ================= STATUS UPDATE =================
-router.put("/:id/status", async (req, res) => {
-  try {
-    const user = getUser(req);
-const lead = await Lead.findOneAndUpdate(
-  {
-    _id: req.params.id,
-    ...getCompanyFilter(req)
-  },
-
-  (() => {
-
-    let temperature = "Cold";
-
-    if (req.body.status === "Interested") {
-      temperature = "Hot";
-    }
-    else if (req.body.status === "Contacted") {
-      temperature = "Warm";
-    }
-
-    return {
-      status: req.body.status,
-      temperature,
-      lastContacted: new Date()
-    };
-
-  })(),
-
-  { new: true }
-).populate("assignedTo", "name email");
-
-    if (!lead) {
-      return res.status(404).json({
-        success: false,
-        message: "Lead not found"
-      });
-    }
-
-    res.json({ success: true, lead });
-
-  } catch (err) {
-    console.error("STATUS ERROR:", err);
-
-    if (err.message === "UNAUTHORIZED") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized"
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
-});
 
 
 // ================= ASSIGN USER =================
@@ -229,7 +151,7 @@ router.put("/:id/assign", async (req, res) => {
     const lead = await Lead.findOneAndUpdate(
       {
         _id: req.params.id,
-        ...getCompanyFilter(req)
+        companyId: new mongoose.Types.ObjectId(user.companyId)
       },
       {
         assignedTo: req.body.userId || null
@@ -244,18 +166,15 @@ router.put("/:id/assign", async (req, res) => {
       });
     }
 
+    await Activity.create({
+      action: `Lead Assigned: ${lead.name}`,
+      user: user.id || user._id,
+      companyId: user.companyId
+    });
+
     res.json({ success: true, lead });
 
   } catch (err) {
-    console.error("ASSIGN ERROR:", err);
-
-    if (err.message === "UNAUTHORIZED") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized"
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: err.message
@@ -265,9 +184,11 @@ router.put("/:id/assign", async (req, res) => {
 // ================= DELETE =================
 router.delete("/:id", async (req, res) => {
   try {
+    const user = getUser(req);
+
     const deleted = await Lead.findOneAndDelete({
       _id: req.params.id,
-      ...getCompanyFilter(req)
+      companyId: new mongoose.Types.ObjectId(user.companyId)
     });
 
     if (!deleted) {
@@ -277,19 +198,21 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
+    await Activity.create({
+      action: `Lead Deleted: ${deleted.name}`,
+      user: user.name || "User",
+      companyId: user.companyId
+    });
+
     res.json({ success: true });
 
   } catch (err) {
     console.error("DELETE ERROR:", err);
 
-    if (err.message === "UNAUTHORIZED") {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized"
-      });
-    }
-
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 });
 // ================= FILE PREVIEW =================
@@ -359,10 +282,10 @@ router.get("/export", async (req, res) => {
 });
 // ================= ADD NOTE =================
 router.post("/:id/notes", async (req, res) => {
+  const user = getUser(req);
 
   try {
 
-    const user = getUser(req);
 
     if (!req.body.note) {
       return res.status(400).json({
@@ -373,7 +296,7 @@ router.post("/:id/notes", async (req, res) => {
 
     const lead = await Lead.findOne({
       _id: req.params.id,
-      ...getCompanyFilter(req)
+      companyId: new mongoose.Types.ObjectId(req.user.companyId)
     });
 
     if (!lead) {
@@ -416,13 +339,14 @@ router.post("/:id/notes", async (req, res) => {
 
 // ================= GET NOTES =================
 router.get("/:id/notes", async (req, res) => {
+  const user = getUser(req);
 
   try {
 
     const notes = await LeadNote.find({
 
       lead: req.params.id,
-      ...getCompanyFilter(req)
+      companyId: new mongoose.Types.ObjectId(req.user.companyId)
 
     })
     .populate("user", "name")

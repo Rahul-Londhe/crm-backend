@@ -1,67 +1,59 @@
+const { Server } = require("socket.io");
+
 let io;
 
 const initSocket = (server) => {
 
-const { Server } = require("socket.io");
+  io = new Server(server, {
+    cors: {
+      origin: [
+        "http://localhost:8080",
+        "https://easygoing-caring-production-9f2c.up.railway.app"
+      ],
+      methods: ["GET", "POST"],
+      credentials: true
+    }
+  });
 
-io = new Server(server, {
+  io.on("connection", (socket) => {
 
+    console.log("✅ Socket Connected:", socket.id);
 
-cors: {
+    socket.on("joinCompany", (companyId) => {
 
-  origin: [
-    "http://localhost:8080",
-    "http://localhost:3000",
-    "https://easygoing-caring-production-9f2c.up.railway.app"
-  ],
+      if (companyId) {
+        socket.join(companyId.toString());
 
-  methods: ["GET", "POST", "PUT", "DELETE"],
+        console.log(
+          `🏢 Company Room Joined: ${companyId}`
+        );
+      }
 
-  credentials: true
+    });
 
-},
+    socket.on("disconnect", () => {
+      console.log(
+        "❌ Socket Disconnected:",
+        socket.id
+      );
+    });
 
-transports: ["websocket", "polling"]
-
-
-});
-
-io.on("connection", (socket) => {
-
-console.log("✅ Socket Connected:", socket.id);
-
-socket.on("joinCompany", (companyId) => {
-
-  socket.join(companyId);
-
-});
-
-socket.on("disconnect", () => {
-
-  console.log("❌ Socket Disconnected:", socket.id);
-
-});
-
-
-});
+  });
 
 };
 
 const getIO = () => {
 
-if (!io) {
+  if (!io) {
+    throw new Error(
+      "Socket.IO not initialized"
+    );
+  }
 
-
-throw new Error("Socket.io not initialized");
-
-
-}
-
-return io;
-
+  return io;
 };
 
 module.exports = {
-initSocket,
-getIO
+  initSocket,
+  getIO
 };

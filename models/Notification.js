@@ -3,9 +3,10 @@ const mongoose = require("mongoose");
 const notificationSchema = new mongoose.Schema(
 {
   user: {
-    type: String,
-    required: true
-  },
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  required: true
+},
 
   message: {
     type: String,

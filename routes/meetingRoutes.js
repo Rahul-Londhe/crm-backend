@@ -3,80 +3,157 @@ const express = require("express");
 const router = express.Router();
 
 const Meeting =
-  require("../models/Meeting");
+require("../models/Meeting");
+
+const auth = require("../middleware/auth");
 
 // ================= CREATE =================
 
-router.post("/", async (req, res) => {
 
-  try {
+router.post("/", auth, async (req,res)=>{
 
-    const meeting =
-      await Meeting.create(req.body);
+try{
 
-    res.json({
-      success: true,
-      meeting
-    });
+const meeting =
+await Meeting.create({
 
-  } catch (err) {
+title: req.body.title,
 
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+client: req.body.client,
 
-  }
+notes: req.body.notes,
+
+start: req.body.start,
+
+end: req.body.end,
+
+companyId: req.user.companyId,
+
+createdBy: req.user.id
+
+});
+
+res.json({
+success:true,
+meeting
+});
+
+}
+catch(err){
+
+res.status(500).json({
+success:false,
+message:err.message
+});
+
+}
 
 });
 
 // ================= GET =================
 
-router.get("/", async (req, res) => {
+router.get("/", auth, async (req,res)=>{
 
-  try {
+try{
 
-    const meetings =
-      await Meeting.find()
-      .sort({ createdAt: -1 });
+const meetings =
+await Meeting.find({
 
-    res.json({
-      success: true,
-      meetings
-    });
+companyId:
+req.user.companyId
 
-  } catch (err) {
+})
+.populate(
+"createdBy",
+"name email"
+)
+.sort({
+createdAt:-1
+});
 
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+res.json({
+success:true,
+meetings
+});
 
-  }
+}
+catch(err){
+
+res.status(500).json({
+success:false,
+message:err.message
+});
+
+}
+
+});
+router.put("/:id", auth, async (req,res)=>{
+
+try{
+
+const meeting =
+await Meeting.findOneAndUpdate(
+
+{
+_id:req.params.id,
+companyId:req.user.companyId
+},
+
+req.body,
+
+{
+new:true
+}
+
+);
+
+res.json({
+success:true,
+meeting
+});
+
+}
+catch(err){
+
+res.status(500).json({
+success:false,
+message:err.message
+});
+
+}
+
+});
+// ================= DELETE =================
+
+router.delete(
+"/:id",
+auth,
+async (req,res)=>{
+
+try{
+
+await Meeting.findOneAndDelete({
+
+_id:req.params.id,
+
+companyId:
+req.user.companyId
 
 });
 
-// ================= DELETE =================
+res.json({
+success:true
+});
 
-router.delete("/:id", async (req, res) => {
+}
+catch(err){
 
-  try {
+res.status(500).json({
+success:false,
+message:err.message
+});
 
-    await Meeting.findByIdAndDelete(
-      req.params.id
-    );
-
-    res.json({
-      success: true
-    });
-
-  } catch (err) {
-
-    res.status(500).json({
-      success: false
-    });
-
-  }
+}
 
 });
 

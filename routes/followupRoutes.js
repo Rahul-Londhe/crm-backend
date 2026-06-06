@@ -1,19 +1,35 @@
 const express = require("express");
 const router = express.Router();
-const Lead = require("../models/Lead"); // make sure Lead model exists
-const { auth } = require("../server"); // import your auth middleware
+const Lead = require("../models/Lead");
 
-// GET followups
-router.get("/", auth, async (req, res) => {
+// GET TODAY FOLLOWUPS
+router.get("/today", async (req, res) => {
   try {
-    const leads = await Lead.find({ nextFollowUp: { $exists: true, $ne: null } })
-      .sort({ nextFollowUp: 1 })
-      .limit(10); // limit to next 10 follow-ups
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    res.json({ success: true, leads });
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const leads = await Lead.find({
+      nextFollowUp: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+
+    res.json({
+      success: true,
+      notifications: leads
+    });
+
   } catch (err) {
-    console.error("FollowUp Error:", err.message);
-    res.status(500).json({ success: false, message: err.message });
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 });
 

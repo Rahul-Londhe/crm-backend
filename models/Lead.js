@@ -27,18 +27,20 @@ const leadSchema = new mongoose.Schema({
     trim: true
   },
 
-  email: { 
-    type: String,
-    trim: true,
-    lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, "Please use valid email"]
-  },
+  email: {
+type: String,
+trim: true,
+lowercase: true,
+default: "",
+match: [/^\S+@\S+\.\S+$/, "Please use valid email"]
+},
 
   phone: { 
     type: String,
     required: true,
     trim: true,
-    minlength: 10
+    minlength: 10,
+maxlength: 15
   },
 company: {
   type: String,
@@ -120,33 +122,65 @@ temperature: {
 }, { timestamps: true });
 
 
-// ================= 🔥 FIXED PRE SAVE =================
-leadSchema.pre("save", async function () {
-  
-  // ===== AI SCORE =====
-  let score = 0;
+// ================= PRE UPDATE MIDDLEWARE =================
+leadSchema.pre("findOneAndUpdate", async function (next) {
+  try {
+    const update = this.getUpdate();
 
-  if (this.priority === "High") score += 40;
-  if (this.status === "Interested") score += 30;
-  if (this.value > 10000) score += 20;
-  if (this.source === "Website") score += 10;
+    // ================= FETCH CURRENT DOC =================
+    const current = await this.model.findOne(this.getQuery());
 
-  this.score = Math.min(score, 100);
+    if (!current) return next();
 
-  // ===== DUPLICATE CHECK =====
-  if (this.isModified("phone")) {
-    const existing = await mongoose.models.Lead.findOne({
-      phone: this.phone,
-      companyId: this.companyId,
-      _id: { $ne: this._id }
-    });
+    // ================= LAST CONTACTED =================
+    if (update.status) {
+      update.lastContacted = new Date();
 
-    if (existing) {
-      throw new Error("DUPLICATE_PHONE"); // ❗ IMPORTANT
+      if (update.status === "Interested") {
+        update.temperature = "Hot";
+      } else if (update.status === "Contacted") {
+        update.temperature = "Warm";
+      } else {
+        update.temperature = "Cold";
+      }
     }
+
+    // ================= DUPLICATE PHONE CHECK =================
+    if (update.phone) {
+      const existing = await mongoose.models.Lead.findOne({
+        phone: update.phone,
+        companyId: current.companyId,
+        _id: { $ne: current._id }
+      });
+
+      if (existing) {
+        throw new Error("DUPLICATE_PHONE");
+      }
+    }
+
+    // ================= AI SCORE =================
+    let score = 0;
+
+    const priority = update.priority || current.priority;
+    const status = update.status || current.status;
+    const value = Number(update.value ?? current.value);
+    const source = update.source || current.source;
+
+    if (priority === "High") score += 40;
+    if (status === "Interested") score += 30;
+    if (value > 10000) score += 20;
+    if (source === "Website") score += 10;
+
+    update.score = Math.min(score, 100);
+
+    this.setUpdate(update);
+    next();
+
+  } catch (err) {
+    next(err);
   }
 });
-
+  
 
 // ✅ UPDATE FIX
 leadSchema.pre(

@@ -1,6 +1,5 @@
 // ================= BASIC =================
 require("dotenv").config();
-require('dns').setDefaultResultOrder('ipv4first');
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -18,10 +17,16 @@ const { sendWhatsAppMessage } = require("./services/whatsappService");
 const Activity = require("./models/Activity");
 const Notification = require("./models/Notification");
 const rateLimit = require("express-rate-limit");
+const helmet = require("helmet");
+const compression = require("compression");
+//const mongoSanitize = require("express-mongo-sanitize");
 const admin = require("./middleware/admin");
 const allowRoles = require("./middleware/roles");
 const app = express();
-
+const notificationRoutes =
+require("./routes/notification");
+const followupRoutes =
+require("./routes/followupRoutes");
 const generatePDF = require("./utils/generateInvoice");
 const http = require("http");
 const server = http.createServer(app);
@@ -30,41 +35,63 @@ const server = http.createServer(app);
 const { initSocket, getIO } = require("./socket");
 
 
-//app.set("io", io);
 // ================= MIDDLEWARE =================
+
+app.use(helmet());
+
+app.use(compression());
+
+//app.use(mongoSanitize());
+
+
+
 app.use(express.json());
-app.use((req, res, next) => {
-  console.log("API HIT:", req.method, req.url);
-  next();
-});
-app.use(morgan("dev"));
 
-
-
-const corsOptions = {
-  origin: [
-    "http://localhost:8080",
-    "https://your-frontend-domain.com"
-  ],
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-};
-
-app.use(cors(corsOptions));
-
-
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5000, // increase limit
-  standardHeaders: true,
-  legacyHeaders: false
-}));
+app.options("*", cors(corsOptions));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 1000,                // 1000 requests
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      message: "Too many requests, please try again later."
+    }
+  })
+);
 const dns = require("dns");
 
 dns.setServers([
   "8.8.8.8",
   "8.8.4.4"
 ]);
+const loginLimiter =
+rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+
+  message: {
+    success: false,
+    message:
+      "Too many login attempts. Try again after 15 minutes."
+  }
+});
+// ================= ENV VALIDATION =================
+
+if (!process.env.JWT_SECRET) {
+  console.error(
+    "JWT_SECRET Missing"
+  );
+  process.exit(1);
+}
+
+if (!process.env.MONGO_URI) {
+  console.error(
+    "MONGO_URI Missing"
+  );
+  process.exit(1);
+}
 // ================= DB =================
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
@@ -72,6 +99,7 @@ mongoose.connect(process.env.MONGO_URI)
     console.error("DB Error:", err.message);
     process.exit(1);
   });
+initSocket(server);
 
 // ================= MODELS =================
 const Company = require("./models/Company");
@@ -98,45 +126,63 @@ const logActivity = async (action, user, companyId) => {
       companyId
     });
 
-    io.to(companyId.toString()).emit("activity", {
-      action,
-      user,
-      time: new Date()
-    });
+    const io = getIO();
+
+io.to(companyId.toString()).emit(
+  "activity",
+  {
+    action,
+    user,
+    time: new Date()
+  }
+);
 
   } catch (err) {
     console.log("Activity Error:", err.message);
   }
 };
 const createNotification = async (
-  user,
-  message,
-  type,
-  companyId
+user,
+message,
+type,
+companyId
 ) => {
 
-  try {
+try {
 
-    const notification = await Notification.create({
-      user,
-      message,
-      type,
-      companyId
-    });
+const notification =
+await Notification.create({
+user,
+message,
+type,
+companyId
+});
 
-    io.to(companyId.toString()).emit(
-      "notification",
-      notification
-    );
+const io = getIO();
 
-  } catch (err) {
-    console.log(err.message);
-  }
+io.to(companyId.toString())
+.emit(
+"notification",
+notification
+);
+
+} catch(err){
+console.log(err.message);
+}
+
 };
 // ================= AUTH =================
 function auth(req, res, next) {
+
+  // ✅ Allow CORS Preflight
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+
+    const token =
+      req.headers.authorization?.split(" ")[1];
 
     console.log("TOKEN:", token);
 
@@ -147,7 +193,10 @@ function auth(req, res, next) {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET
+    );
 
     console.log("DECODED:", decoded);
 
@@ -160,14 +209,19 @@ function auth(req, res, next) {
 
     req.user = decoded;
 
-    next(); // ✅ ONLY HERE
+    next();
 
   } catch (err) {
+
+    console.log("AUTH ERROR:", err.message);
+
     return res.status(401).json({
       success: false,
       message: "Unauthorized"
     });
+
   }
+
 }
 // ✅ AFTER AUTH ADD THIS
 const leadsRoutes = require("./routes/leads");
@@ -175,12 +229,49 @@ const leadsRoutes = require("./routes/leads");
 const uploadPath = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadPath);
+  },
 
+  filename: (req, file, cb) => {
+    cb(
+      null,
+      Date.now() + "-" + file.originalname
+    );
+  }
+});
+const upload = multer({
+  storage,
+
+  fileFilter: (req, file, cb) => {
+
+    const allowed = [
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "application/pdf"
+    ];
+
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid File Type"));
+    }
+  }
+});
 app.use("/uploads", express.static(uploadPath));
 
 // ✅ PREVIEW
-app.get("/api/leads/file/:filename", (req, res) => {
-  const filePath = path.join(uploadPath, req.params.filename);
+app.get(
+"/api/leads/file/:filename",
+auth,
+(req,res)=>{
+  const filename =
+path.basename(req.params.filename);
+
+const filePath =
+path.join(uploadPath, filename);
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ success: false, message: "File not found" });
@@ -190,8 +281,15 @@ app.get("/api/leads/file/:filename", (req, res) => {
 });
 
 // ✅ DOWNLOAD
-app.get("/api/leads/file/:filename/download", (req, res) => {
-  const filePath = path.join(uploadPath, req.params.filename);
+app.get(
+"/api/leads/file/:filename/download",
+auth,
+(req,res)=>{
+  const filename =
+path.basename(req.params.filename);
+
+const filePath =
+path.join(uploadPath, filename);
 
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ success: false, message: "File not found" });
@@ -202,13 +300,6 @@ app.get("/api/leads/file/:filename/download", (req, res) => {
 
 
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadPath),
-    filename: (req, file, cb) =>
-      cb(null, Date.now() + path.extname(file.originalname))
-  })
-});
 
 // ================= RAZORPAY =================
 const razorpay = new Razorpay({
@@ -233,8 +324,9 @@ const meetingRoutes =
 require("./routes/meetingRoutes");
 
 app.use(
-  "/api/meetings",
-  meetingRoutes
+"/api/meetings",
+auth,
+meetingRoutes
 );
 // ================= EMPLOYEE ROUTES =================
 app.use(
@@ -259,6 +351,18 @@ app.use(
   auth,
   allowRoles("admin", "hr"),
   payrollRoutes
+);
+
+app.use(
+"/api/notifications",
+auth,
+notificationRoutes
+);
+
+app.use(
+"/api/followups",
+auth,
+followupRoutes
 );
 // ================= WHATSAPP =================
 router.post("/whatsapp/send", auth, async (req, res) => {
@@ -313,142 +417,183 @@ router.post("/email/send", auth, async (req, res) => {
   }
 });
 // ================= AUTH =================
-router.post("/auth/register", async (req, res) => {
-  try {
-    let { name, email, password, companyId } = req.body;
+router.post(
+"/auth/register",
+upload.single("logo"),
+async (req, res) => {
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields required"
-      });
-    }
+try {
 
-    email = email.toLowerCase().trim();
+const {
+name,
+email,
+username,
+password,
+companyName
+} = req.body;
+if(
+!name ||
+!email ||
+!username ||
+!password ||
+!companyName
+){
+return res.status(400).json({
+success:false,
+message:"All fields required"
+});
+}
 
-    const exist = await User.findOne({ email });
-    
-    if (exist) {
-      return res.status(400).json({
-        success: false,
-        message: "User already exists"
-      });
-    }
-
-    const hashed = await bcrypt.hash(password, 10);
-console.log("REGISTER PASSWORD:", password);
-console.log("HASHED PASSWORD:", hashed);
-    let finalCompanyId = companyId;
-
-    if (!finalCompanyId) {
-      const newCompany = await Company.create({
-  name: name + " Company",   // ✅ FIX
-  owner: null
+const existingUser =
+await User.findOne({
+email: email.toLowerCase().trim()
 });
 
-      finalCompanyId = newCompany._id;
-    }
-
-    // Check if company already has users
-const existingUsers = await User.find({ companyId: finalCompanyId });
-
-// First user = Admin
-const role = existingUsers.length === 0 ? "admin" : "employee";
-
-const user = await User.create({
-  name,
-  email,
-  password: hashed,
-  role: role,   // ✅ FIX
-  companyId: finalCompanyId
+if(existingUser){
+return res.status(400).json({
+success:false,
+message:"User already exists"
 });
-    await Company.findByIdAndUpdate(finalCompanyId, {
-      owner: user._id
-    });
-const token = jwt.sign(
-  { 
-  id: user._id,
-  name: user.name,
-  companyId: user.companyId.toString(),
-  role: user.role 
+}
+
+const company =
+await Company.create({
+name: companyName,
+logo: req.file
+? req.file.filename
+: ""
+});
+
+const hashedPassword =
+await bcrypt.hash(password,10);
+
+const user =
+await User.create({
+name,
+email,
+username,
+password: hashedPassword,
+role: "admin",
+companyId: company._id
+});
+
+company.owner = user._id;
+
+await company.save();
+
+const token =
+jwt.sign(
+{
+id:user._id,
+name:user.name,
+companyId:company._id,
+role:user.role
 },
-  process.env.JWT_SECRET
+process.env.JWT_SECRET,
+{
+expiresIn:"7d"
+}
 );
-    res.json({
-      success: true,
-      user,
-      token
-    });
 
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+return res.status(201).json({
+success:true,
+token,
+user,
+company
+});
+
+}
+catch(err){
+
+console.log(
+"REGISTER ERROR:",
+err
+);
+
+return res.status(500).json({
+success:false,
+message:err.message
+});
+
+}
+
+}
+);
+
+router.post(
+"/auth/login",
+loginLimiter,
+async (req, res) => {
+try {
+
+
+let { email, password } = req.body;
+
+if (!email || !password) {
+  return res.status(400).json({
+    success: false,
+    message: "Email and Password required"
+  });
+}
+
+email = email.toLowerCase().trim();
+
+const user = await User.findOne({ email });
+
+if (!user) {
+  return res.status(400).json({
+    success: false,
+    message: "User not found"
+  });
+}
+
+const match = await bcrypt.compare(
+  password,
+  user.password
+);
+
+if (!match) {
+  return res.status(400).json({
+    success: false,
+    message: "Wrong password"
+  });
+}
+
+const token = jwt.sign(
+{
+id: user._id,
+name: user.name,
+companyId: user.companyId.toString(),
+role: user.role
+},
+  process.env.JWT_SECRET,
+  {
+    expiresIn: "7d"
   }
-});
-router.post("/auth/login", async (req, res) => {
-  try {
-    let { email, password } = req.body;
+);
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email/password missing"
-      });
-    }
-
-    email = email.toLowerCase().trim();
-console.log("EMAIL RECEIVED:", email);
-    const user = await User.findOne({
-  email: { $regex: new RegExp("^" + email.trim() + "$", "i") }
+return res.status(200).json({
+  success: true,
+  token,
+  user
 });
 
-    console.log("USER FOUND:", user);
 
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "User not found"
-      });
-    }
+} catch (err) {
 
-    const match = await bcrypt.compare(password, user.password);
 
-    console.log("PASSWORD MATCH:", match);
+console.log("LOGIN ERROR:", err);
 
-    if (!match) {
-      return res.status(400).json({
-        success: false,
-        message: "Wrong password"
-      });
-    }
-
-    const token = jwt.sign({
-      id: user._id,
-      companyId: user.companyId.toString(),
-      role: user.role
-    }, process.env.JWT_SECRET);
-
-    return res.json({
-      success: true,
-      user,
-      token
-    });
-
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
+return res.status(500).json({
+  success: false,
+  message: err.message
 });
+
+
+}
+});
+
 // ================= USERS =================
-router.get("/users", auth, admin, async (req, res) => {
-  const users = await User.find({ companyId: new mongoose.Types.ObjectId(req.user.companyId) });
-  res.json({ success: true, users });
-});
 
 // ================= UPDATE USER ROLE =================
 router.put(
@@ -491,31 +636,70 @@ router.put(
   }
 );
 router.put(
-  "/make-admin/:id",
+"/make-admin/:id",
+auth,
+admin,
+async (req,res)=>{
+
+ const user =
+ await User.findOneAndUpdate(
+ {
+   _id:req.params.id,
+   companyId:req.user.companyId
+ },
+ {
+   role:"admin"
+ },
+ {
+   new:true
+ }
+ );
+
+ if(!user){
+   return res.status(404).json({
+     success:false,
+     message:"User not found"
+   });
+ }
+
+ res.json({
+   success:true,
+   user
+ });
+
+});
+router.get(
+  "/users",
   auth,
-  admin,
   async (req, res) => {
-  try {
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { role: "admin" },
-      { new: true }
-    );
+    try {
 
-    res.json({
-      success: true,
-      user
-    });
+      const users =
+      await User.find({
+        companyId:
+        req.user.companyId
+      })
+      .select(
+        "name email role"
+      );
 
-  } catch (err) {
+      res.json({
+        success: true,
+        users
+      });
 
-    res.status(500).json({
-      success: false
-    });
+    } catch (err) {
+
+      res.status(500).json({
+        success: false,
+        message: err.message
+      });
+
+    }
 
   }
-});
+);
 // ================= ACTIVITY =================
 router.get("/activity", auth, async (req, res) => {
   try {
@@ -534,16 +718,24 @@ router.get("/activity", auth, async (req, res) => {
 // ================= COMPANY =================
 router.post("/company", auth, upload.single("logo"), async (req, res) => {
     try {
+console.log("COMPANY API HIT");
+  console.log("BODY:", req.body);
 
       const {
-        name,
-        email,
-        phone,
-        businessType,
-        username,
-        password
-      } = req.body;
-
+name,
+email,
+phone,
+businessType,
+username,
+password
+} = req.body;
+if(password.length < 8){
+return res.status(400).json({
+success:false,
+message:
+"Password must be minimum 8 characters"
+});
+}
       // ✅ REQUIRED VALIDATION
       if (
         !name ||
@@ -560,16 +752,18 @@ router.post("/company", auth, upload.single("logo"), async (req, res) => {
       }
 
       // ✅ CHECK EXISTING USER
-      const existing = await User.findOne({
-        email
-      });
+     const emailExist =
+await User.findOne({
+email
+});
 
-      if (existing) {
-        return res.status(400).json({
-          success: false,
-          message: "Email already exists"
-        });
-      }
+if(emailExist){
+return res.status(400).json({
+success:false,
+message:"Email already exists"
+});
+}
+
 
       // ✅ HASH PASSWORD
       const hashed =
@@ -634,10 +828,29 @@ router.post("/company", auth, upload.single("logo"), async (req, res) => {
 });
 
 router.get("/company", auth, async (req, res) => {
-  const companies = await Company.find({ owner: req.user.id });
-  res.json({ success: true, companies });
-});
 
+  try {
+
+    const company =
+      await Company.findById(
+        req.user.companyId
+      );
+
+    res.json({
+      success: true,
+      company
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
+
+});
 // ================= LEADS =================
 
 // ================= TASKS =================
@@ -707,7 +920,12 @@ router.post("/tasks", auth, async (req, res) => {
   status: req.body.status || "Pending",
   dueDate: req.body.dueDate || null,
   lead: req.body.lead || null,
-  user: req.user.id,
+
+  user:
+    req.body.user ||
+    req.body.assignedTo ||
+    req.user.id,
+
   companyId: req.user.companyId
 });
 
@@ -718,15 +936,43 @@ await logActivity(
   req.user.companyId
 );
 await createNotification(
-  req.user.name,
+  req.user.id,
   "New Task Created: " + task.title,
   "task",
   req.user.companyId
 );
-// SOCKET
-io.to(req.user.companyId.toString()).emit("taskCreated", task);
 
-res.status(201).json({ success: true, task });
+// Assigned User Notification
+
+if (task.user) {
+
+  await createNotification(
+    task.user,
+    `Task Assigned: ${task.title}`,
+    "task",
+    req.user.companyId
+  );
+
+}
+// SOCKET
+const io = getIO();
+
+const populatedTask =
+await Task.findById(task._id)
+.populate("user", "name email")
+.populate("lead", "name");
+
+io.to(
+  req.user.companyId.toString()
+).emit(
+  "taskCreated",
+  populatedTask
+);
+
+res.status(201).json({
+  success: true,
+  task
+});
 
   } catch (err) {
     console.error("TASK ERROR:", err);
@@ -758,12 +1004,19 @@ if (task) {
     req.user.companyId
   );
 await createNotification(
-  req.user.name,
+  req.user._id,
   "Task Updated: " + task.title,
   "task",
   req.user.companyId
 );
-  io.to(req.user.companyId.toString()).emit("taskUpdated", task);
+  const io = getIO();
+
+io.to(
+  req.user.companyId.toString()
+).emit(
+  "taskUpdated",
+  task
+);
 }
 
 res.json({ success: true, task });
@@ -793,7 +1046,7 @@ router.put("/tasks/:id/complete", auth, async (req, res) => {
       req.user.name || "Unknown User",
       req.user.companyId
     );
-
+const io = getIO();
     io.to(req.user.companyId.toString()).emit(
       "taskUpdated",
       task
@@ -829,13 +1082,21 @@ router.delete("/tasks/:id", auth, async (req, res) => {
     companyId: new mongoose.Types.ObjectId(req.user.companyId)
   });
 if (task) {
-  await logActivity(
-  "Task Deleted: " + task.title,
-  req.user.name || "Unknown User",
-  req.user.companyId
-);
 
-  io.to(req.user.companyId.toString()).emit("taskDeleted", task);
+  await logActivity(
+    "Task Deleted: " + task.title,
+    req.user.name || "Unknown User",
+    req.user.companyId
+  );
+
+  const io = getIO();
+
+  io.to(
+    req.user.companyId.toString()
+  ).emit(
+    "taskDeleted",
+    task._id
+  );
 }
   res.json({ success: true });
 });
@@ -860,7 +1121,8 @@ router.get("/leads/export", auth, async (req, res) => {
 
     XLSX.utils.book_append_sheet(wb, ws, "Leads");
 
-    const filePath = "./leads.xlsx";
+    const filePath =
+`./leads-${Date.now()}.xlsx`;
     XLSX.writeFile(wb, filePath);
 
     res.download(filePath, () => {
@@ -1224,31 +1486,7 @@ router.get(
   }
 );
 // ================= NOTIFICATIONS =================
-router.get("/notifications/all", auth, async (req, res) => {
 
-  try {
-
-    const notifications = await Notification.find({
-      companyId: req.user.companyId
-    })
-    .sort({ createdAt: -1 })
-    .limit(50);
-
-    res.json({
-      success: true,
-      notifications
-    });
-
-  } catch (err) {
-
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
-
-  }
-
-});
 router.get("/notifications", auth, async (req, res) => {
   const today = new Date();
 
@@ -1265,76 +1503,9 @@ router.get("/notifications", auth, async (req, res) => {
   res.json({ success: true, tasks, leads });
 });
 // ================= UNREAD COUNT =================
-router.get(
-  "/notifications/unread-count",
-  auth,
-  async (req, res) => {
-
-    try {
-
-      const count =
-        await Notification.countDocuments({
-          companyId: req.user.companyId,
-          read: false
-        });
-
-      res.json({
-        success: true,
-        count
-      });
-
-    } catch (err) {
-
-      res.status(500).json({
-        success: false,
-        message: err.message
-      });
-
-    }
-
-});
 
 // ================= MARK AS READ =================
-router.put(
-  "/notifications/:id/read",
-  auth,
-  async (req, res) => {
 
-    try {
-
-      const notification =
-        await Notification.findOneAndUpdate(
-
-          {
-            _id: req.params.id,
-            companyId: req.user.companyId
-          },
-
-          {
-            read: true
-          },
-
-          {
-            new: true
-          }
-
-        );
-
-      res.json({
-        success: true,
-        notification
-      });
-
-    } catch (err) {
-
-      res.status(500).json({
-        success: false,
-        message: err.message
-      });
-
-    }
-
-});
 // ================= INVOICES =================
 router.get("/invoices", auth, async (req, res) => {
   try {
@@ -1569,6 +1740,39 @@ app.use((err, req, res, next) => {
     message: err.message || "Internal Server Error"
   });
 });
+// ================= ACTIVITY CLEANUP =================
+
+setInterval(async () => {
+
+try {
+
+const ninetyDaysAgo =
+new Date();
+
+ninetyDaysAgo.setDate(
+ninetyDaysAgo.getDate() - 90
+);
+
+await Activity.deleteMany({
+createdAt: {
+$lt: ninetyDaysAgo
+}
+});
+
+console.log(
+"Old Activity Logs Deleted"
+);
+
+} catch(err){
+
+console.log(
+"Activity Cleanup Error:",
+err.message
+);
+
+}
+
+}, 24 * 60 * 60 * 1000);
 server.listen(process.env.PORT || 5000, () => {
   console.log("🚀 FULL CRM SERVER RUNNING");
 });

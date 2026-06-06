@@ -4,22 +4,14 @@ const meetingSchema = new mongoose.Schema({
 
   title: {
     type: String,
-    required: true
-  },
-
-  date: {
-    type: String,
-    required: true
-  },
-
-  time: {
-    type: String,
-    required: true
+    required: true,
+    trim: true
   },
 
   client: {
     type: String,
-    default: ""
+    default: "",
+    trim: true
   },
 
   notes: {
@@ -27,9 +19,20 @@ const meetingSchema = new mongoose.Schema({
     default: ""
   },
 
-  status: {
-    type: String,
-    default: "Pending"
+  start: {
+    type: Date,
+    required: true
+  },
+
+  end: {
+    type: Date,
+    required: true
+  },
+
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Company",
+    required: true
   },
 
   createdBy: {
@@ -37,12 +40,12 @@ const meetingSchema = new mongoose.Schema({
     ref: "User"
   }
 
-}, {
+},
+{
   timestamps: true
 });
 
-module.exports =
-  mongoose.model(
-    "Meeting",
-    meetingSchema
-  );
+module.exports = mongoose.model(
+  "Meeting",
+  meetingSchema
+);

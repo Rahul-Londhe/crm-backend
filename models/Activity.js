@@ -26,4 +26,15 @@ const activitySchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Activity", activitySchema);
+// Auto Delete After 90 Days
+activitySchema.index(
+  { createdAt: 1 },
+  {
+    expireAfterSeconds: 60 * 60 * 24 * 90
+  }
+);
+
+module.exports = mongoose.model(
+  "Activity",
+  activitySchema
+);
