@@ -23,6 +23,7 @@ const compression = require("compression");
 const admin = require("./middleware/admin");
 const allowRoles = require("./middleware/roles");
 const app = express();
+app.set("trust proxy", 1);
 const notificationRoutes =
 require("./routes/notification");
 const followupRoutes =
@@ -534,75 +535,95 @@ message:err.message
 );
 
 router.post(
-"/auth/login",
-loginLimiter,
-async (req, res) => {
+  "/auth/login",
+  loginLimiter,
+  async (req, res) => {
 
-try {
+    try {
 
-let { email, password } = req.body;
+      let { email, password } = req.body;
 
-if (!email || !password) {
-  return res.status(400).json({
-    success: false,
-    message: "Email and Password required"
-  });
-}
+      console.log("================================");
+      console.log("LOGIN REQUEST RECEIVED");
+      console.log("EMAIL:", email);
+      console.log(
+        "PASSWORD LENGTH:",
+        password ? password.length : 0
+      );
 
-email = email.toLowerCase().trim();
+      if (!email || !password) {
 
-const user = await User.findOne({ email });
+        return res.status(400).json({
+          success: false,
+          message: "Email and Password required"
+        });
 
-if (!user) {
-  return res.status(400).json({
-    success: false,
-    message: "User not found"
-  });
-}
+      }
 
-const match = await bcrypt.compare(
-  password,
-  user.password
-);
+      email = email.toLowerCase().trim();
 
-if (!match) {
-  return res.status(400).json({
-    success: false,
-    message: "Wrong password"
-  });
-}
+      const user = await User.findOne({ email });
 
-const token = jwt.sign(
-{
-  id: user._id,
-  name: user.name,
-  companyId: user.companyId.toString(),
-  role: user.role
-},
-process.env.JWT_SECRET,
-{
-  expiresIn: "7d"
-}
-);
+      console.log("USER FOUND:", user);
 
-return res.status(200).json({
-  success: true,
-  token,
-  user
-});
+      if (!user) {
 
-} catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: "User not found"
+        });
 
-console.log("LOGIN ERROR:", err);
+      }
 
-return res.status(500).json({
-  success: false,
-  message: err.message
-});
+      const match = await bcrypt.compare(
+        password,
+        user.password
+      );
 
-}
+      console.log("PASSWORD MATCH:", match);
 
-}
+      if (!match) {
+
+        return res.status(400).json({
+          success: false,
+          message: "Wrong password"
+        });
+
+      }
+
+      const token = jwt.sign(
+        {
+          id: user._id,
+          name: user.name,
+          companyId: user.companyId.toString(),
+          role: user.role
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "7d"
+        }
+      );
+
+      console.log("LOGIN SUCCESS:", user.email);
+
+      return res.status(200).json({
+        success: true,
+        token,
+        user
+      });
+
+    } catch (err) {
+
+      console.log("LOGIN ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: err.message
+      });
+
+    }
+
+  }
 );
 // ================= USERS =================
 
