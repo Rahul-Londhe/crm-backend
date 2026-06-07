@@ -537,10 +537,15 @@ router.post(
 "/auth/login",
 loginLimiter,
 async (req, res) => {
+
 try {
 
-
 let { email, password } = req.body;
+
+console.log("LOGIN REQUEST:", {
+  email,
+  passwordLength: password?.length
+});
 
 if (!email || !password) {
   return res.status(400).json({
@@ -552,6 +557,8 @@ if (!email || !password) {
 email = email.toLowerCase().trim();
 
 const user = await User.findOne({ email });
+
+console.log("USER FOUND:", user);
 
 if (!user) {
   return res.status(400).json({
@@ -565,47 +572,14 @@ const match = await bcrypt.compare(
   user.password
 );
 
+console.log("PASSWORD MATCH:", match);
+
 if (!match) {
   return res.status(400).json({
     success: false,
     message: "Wrong password"
   });
 }
-
-const token = jwt.sign(
-{
-id: user._id,
-name: user.name,
-companyId: user.companyId.toString(),
-role: user.role
-},
-  process.env.JWT_SECRET,
-  {
-    expiresIn: "7d"
-  }
-);
-
-return res.status(200).json({
-  success: true,
-  token,
-  user
-});
-
-
-} catch (err) {
-
-
-console.log("LOGIN ERROR:", err);
-
-return res.status(500).json({
-  success: false,
-  message: err.message
-});
-
-
-}
-});
-
 // ================= USERS =================
 
 // ================= UPDATE USER ROLE =================
