@@ -543,52 +543,48 @@ router.post(
 
       let { email, password } = req.body;
 
-      console.log("================================");
+      console.log("=================================");
       console.log("LOGIN REQUEST RECEIVED");
-      console.log("EMAIL:", email);
-      console.log(
-        "PASSWORD LENGTH:",
-        password ? password.length : 0
-      );
+      console.log("EMAIL FROM FRONTEND:", email);
+      console.log("PASSWORD ENTERED:", password);
+      console.log("=================================");
 
       if (!email || !password) {
-
         return res.status(400).json({
           success: false,
           message: "Email and Password required"
         });
-
       }
 
       email = email.toLowerCase().trim();
+
+      console.log("EMAIL AFTER FORMAT:", email);
 
       const user = await User.findOne({ email });
 
       console.log("USER FOUND:", user);
 
       if (!user) {
-
         return res.status(400).json({
           success: false,
           message: "User not found"
         });
-
       }
+
+      console.log("HASH FROM DB:", user.password);
 
       const match = await bcrypt.compare(
         password,
         user.password
       );
 
-      console.log("PASSWORD MATCH:", match);
+      console.log("MATCH RESULT:", match);
 
       if (!match) {
-
         return res.status(400).json({
           success: false,
           message: "Wrong password"
         });
-
       }
 
       const token = jwt.sign(
@@ -604,7 +600,7 @@ router.post(
         }
       );
 
-      console.log("LOGIN SUCCESS:", user.email);
+      console.log("LOGIN SUCCESS");
 
       return res.status(200).json({
         success: true,
