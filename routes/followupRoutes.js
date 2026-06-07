@@ -4,6 +4,10 @@ const Lead = require("../models/Lead");
 
 // GET TODAY FOLLOWUPS
 router.get("/today", async (req, res) => {
+
+console.log("FOLLOWUP USER:", req.user);
+
+
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -12,16 +16,18 @@ router.get("/today", async (req, res) => {
     tomorrow.setDate(today.getDate() + 1);
 
     const leads = await Lead.find({
-      nextFollowUp: {
-        $gte: today,
-        $lt: tomorrow
-      }
-    });
+  companyId: req.user.companyId,
 
-    res.json({
-      success: true,
-      notifications: leads
-    });
+  nextFollowUp: {
+    $gte: today,
+    $lt: tomorrow
+  }
+});
+
+   res.json({
+  success: true,
+  leads
+});
 
   } catch (err) {
     console.log(err);
