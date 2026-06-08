@@ -46,34 +46,58 @@ router.post("/", auth, async (req, res) => {
 
     const companyId = new mongoose.Types.ObjectId(req.user.companyId);
 
-    const leadData = await Lead.findOne({
-      _id: lead,
-      companyId
-    });
+    console.log("LEAD ID RECEIVED:", lead);
+console.log("COMPANY ID:", companyId);
+
+const leadData = await Lead.findOne({
+  _id: lead,
+  companyId
+});
+
+console.log("LEAD DATA:", leadData);
 
     if (!leadData) {
       return res.status(404).json({ message: "Lead not found" });
     }
-
-    const invoice = await Invoice.create({
-      invoiceNumber,
-      lead,
-      amount: Number(amount),
-      dueDate: dueDate || null,
-      user: req.user.id || req.user._id,
-      companyId
-    });
-
-    res.json({ success: true, invoice });
-
-  } catch (err) {
-    console.error("INVOICE ERROR:", err);
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
-  }
+console.log("INVOICE DATA TO SAVE:", {
+  invoiceNumber,
+  lead,
+  amount,
+  dueDate,
+  user: req.user.id || req.user._id,
+  companyId
 });
+    const invoice = await Invoice.create({
+  invoiceNumber,
+  lead,
+  amount: Number(amount),
+  dueDate: dueDate || null,
+  user: req.user.id || req.user._id,
+  companyId
+});
+
+res.json({
+  success: true,
+  invoice
+});
+
+} catch (err) {
+
+  console.log("========== INVOICE ERROR ==========");
+  console.log(err);
+
+  if (err.errors) {
+    console.log("VALIDATION ERRORS:", err.errors);
+  }
+
+  return res.status(500).json({
+    success: false,
+    message: err.message
+  });
+
+}
+});
+
 
 // ================= PAYMENT =================
 router.post("/:id/payment", auth, async (req, res) => {

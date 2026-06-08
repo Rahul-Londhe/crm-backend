@@ -140,8 +140,70 @@ router.put("/:id", upload.single("file"), async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
 // ================= STATUS UPDATE =================
 
+router.put("/:id/status", auth, async (req, res) => {
+
+  try {
+
+    const user = getUser(req);
+
+    const lead = await Lead.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        companyId: new mongoose.Types.ObjectId(user.companyId)
+      },
+      {
+        status: req.body.status
+      },
+      {
+        new: true
+      }
+    ).populate("assignedTo", "name email");
+
+    if (!lead) {
+
+      return res.status(404).json({
+        success: false,
+        message: "Lead not found"
+      });
+
+    }
+
+    await Activity.create({
+      action: `Lead Status Changed: ${lead.name} → ${req.body.status}`,
+      user: user.name || "User",
+      companyId: user.companyId
+    });
+
+    // SOCKET EVENT
+    const io = req.app.get("io");
+
+    if (io) {
+
+      io.to(user.companyId.toString())
+        .emit("leadStatusUpdated", lead);
+
+    }
+
+    res.json({
+      success: true,
+      lead
+    });
+
+  } catch (err) {
+
+    console.log("STATUS UPDATE ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
+
+});
 
 // ================= ASSIGN USER =================
 router.put("/:id/assign", async (req, res) => {
