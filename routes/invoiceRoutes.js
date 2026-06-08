@@ -28,7 +28,20 @@ router.get("/", auth, async (req, res) => {
 router.post("/", auth, async (req, res) => {
   try {
     const { invoiceNumber, lead, amount, dueDate } = req.body;
+console.log(
+  "LEAD TYPE:",
+  typeof lead
+);
 
+console.log(
+  "LEAD VALUE:",
+  lead
+);
+
+console.log(
+  "VALID ID:",
+  mongoose.Types.ObjectId.isValid(lead)
+);
     console.log("USER:", req.user);
     console.log("BODY:", req.body);
 
