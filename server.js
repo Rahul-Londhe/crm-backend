@@ -437,18 +437,22 @@ upload.single("logo"),
 async (req, res) => {
 
 try {
-
+console.log(
+"REGISTER BODY:",
+req.body
+);
 const {
 name,
 email,
-username,
 password,
-companyName
+username,
+companyName,
+phone,
+businessType
 } = req.body;
 if(
 !name ||
 !email ||
-!username ||
 !password ||
 !companyName
 ){
@@ -477,16 +481,16 @@ logo: req.file
 ? req.file.filename
 : ""
 });
-
-const hashedPassword =
-await bcrypt.hash(password,10);
-
+console.log(
+"COMPANY CREATED:",
+company
+);
 const user =
 await User.create({
 name,
 email,
 username,
-password: hashedPassword,
+password,
 role: "admin",
 companyId: company._id
 });
@@ -1065,7 +1069,10 @@ router.put("/tasks/:id/complete", auth, async (req, res) => {
       });
     }
 
-    task.completed = !task.completed;
+    task.status =
+task.status === "Completed"
+? "Pending"
+: "Completed";
 
     await task.save();
 

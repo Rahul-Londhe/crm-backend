@@ -1,10 +1,46 @@
 const mongoose = require("mongoose");
 
 const settingsSchema = new mongoose.Schema({
-  user: {
+
+  companyId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
+    ref: "Company",
     required: true
+  },
+
+  companyName: {
+    type: String,
+    default: ""
+  },
+
+  companyEmail: {
+    type: String,
+    default: ""
+  },
+
+  companyPhone: {
+    type: String,
+    default: ""
+  },
+
+  whatsappNumber: {
+    type: String,
+    default: ""
+  },
+
+  smtpEmail: {
+    type: String,
+    default: ""
+  },
+
+  smtpPassword: {
+    type: String,
+    default: ""
+  },
+
+  logo: {
+    type: String,
+    default: ""
   },
 
   whatsappAuto: {
@@ -17,6 +53,10 @@ const settingsSchema = new mongoose.Schema({
     default: false
   }
 
-}, { timestamps: true });
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model("Settings", settingsSchema);
+module.exports =
+mongoose.models.Settings ||
+mongoose.model("Settings", settingsSchema);

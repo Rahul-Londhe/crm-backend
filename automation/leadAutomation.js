@@ -96,21 +96,19 @@ console.log("AI SCORE:", score);
 
     // ================= NOTIFICATION =================
     const notification =
-      await Notification.create({
+await Notification.create({
 
-        user:
-          user.name || "Unknown",
+  user: user.id,
 
-        message:
-          `New Lead Assigned: ${lead.name}`,
+  message:
+    `New Lead Assigned: ${lead.name}`,
 
-        type: "lead",
+  type: "lead",
 
-        companyId:
-          user.companyId
+  companyId:
+    user.companyId
 
-      });
-
+});
     // ================= SOCKET =================
     if (io) {
 

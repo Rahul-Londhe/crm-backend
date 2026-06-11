@@ -20,11 +20,13 @@ router.post("/", async (req, res) => {
     const { title, leadId, status, dueDate } = req.body;
 
     const task = new Task({
-      title,
-      lead: leadId,
-      status: status || "pending",
-      dueDate: dueDate || null
-    });
+  title,
+  lead: leadId,
+  companyId: req.user.companyId,
+  user: req.user.id,
+  status: "Pending",
+  dueDate: dueDate || null
+});
 
     await task.save();
 
@@ -32,12 +34,11 @@ router.post("/", async (req, res) => {
     if (leadId) {
       const lead = await Lead.findById(leadId);
       if (lead) {
-        lead.addActivity(
-          "Note",
-          `Task Created: ${title}`,
-          null
-        );
-        await lead.save();
+        await Activity.create({
+  action: `Task Created: ${title}`,
+  user: req.user.name,
+  companyId: req.user.companyId
+});
       }
     }
 
