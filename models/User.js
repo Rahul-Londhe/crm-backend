@@ -18,8 +18,9 @@ trim: true
 },
 username: {
   type: String,
-  unique: true,
-  trim: true
+  trim: true,
+  sparse: true,
+  unique: true
 },
 password: {
 type: String,

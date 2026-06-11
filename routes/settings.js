@@ -35,10 +35,11 @@ settings
 
 } catch (err) {
 
-console.log(err);
+console.log("SETTINGS ERROR:", err);
 
 res.status(500).json({
-success: false
+success: false,
+message: err.message
 });
 
 }

@@ -70,7 +70,11 @@ router.get("/", auth, async (req, res) => {
 });
 
 // ================= CREATE =================
-router.post("/", upload.single("file"), async (req, res) => {
+router.post(
+  "/",
+  auth,
+  upload.single("file"),
+  async (req, res) => {
   try {
     const user = getUser(req);
 
