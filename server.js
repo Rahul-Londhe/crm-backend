@@ -1735,9 +1735,48 @@ router.post("/ai/chat", auth, async (req, res) => {
 
 // ================= SETTINGS =================
 router.get("/settings", auth, async (req, res) => {
-  let settings = await Settings.findOne({ user: req.user.id });
-  if (!settings) settings = await Settings.create({ user: req.user.id });
-  res.json({ success: true, settings });
+
+  try {
+
+    let settings =
+    await Settings.findOne({
+      companyId: req.user.companyId
+    });
+
+    if (!settings) {
+
+      settings =
+      await Settings.create({
+
+        companyId:
+        req.user.companyId,
+
+        companyName: "",
+
+        companyEmail: "",
+
+        companyPhone: "",
+
+        whatsappNumber: ""
+
+      });
+
+    }
+
+    res.json({
+      success: true,
+      settings
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
+
 });
 
 router.put("/settings", auth, async (req, res) => {

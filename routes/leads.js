@@ -147,7 +147,7 @@ router.put("/:id", upload.single("file"), async (req, res) => {
 
 // ================= STATUS UPDATE =================
 
-router.put("/:id/status", auth, async (req, res) => {
+router.put("/:id/status", async (req,res)=>{
 
   try {
 

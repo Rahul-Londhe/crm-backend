@@ -51,8 +51,11 @@ const settingsSchema = new mongoose.Schema({
   emailAuto: {
     type: Boolean,
     default: false
-  }
-
+  },
+autoFollowupEnabled: {
+  type: Boolean,
+  default: true
+},
 }, {
   timestamps: true
 });
