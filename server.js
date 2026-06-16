@@ -31,7 +31,7 @@ require("./routes/followupRoutes");
 const generatePDF = require("./utils/generateInvoice");
 const http = require("http");
 const server = http.createServer(app);
-
+const auth = require("./middleware/auth");
 
 const { initSocket, getIO } = require("./socket");
 
@@ -186,57 +186,7 @@ console.log(err.message);
 
 };
 // ================= AUTH =================
-function auth(req, res, next) {
 
-  // ✅ Allow CORS Preflight
-  if (req.method === "OPTIONS") {
-    return next();
-  }
-
-  try {
-
-    const token =
-      req.headers.authorization?.split(" ")[1];
-
-    console.log("TOKEN:", token);
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "No token"
-      });
-    }
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
-
-    console.log("DECODED:", decoded);
-
-    if (!decoded?.id || !decoded?.companyId) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid token"
-      });
-    }
-
-    req.user = decoded;
-
-    next();
-
-  } catch (err) {
-
-    console.log("AUTH ERROR:", err.message);
-
-    return res.status(401).json({
-      success: false,
-      message: "Unauthorized"
-    });
-
-  }
-
-}
 // ✅ AFTER AUTH ADD THIS
 const leadsRoutes = require("./routes/leads");
 // ================= FILE UPLOAD =================
