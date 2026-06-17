@@ -9,7 +9,7 @@ const path = require("path");
 const fs = require("fs");
 const runLeadAutomation =
 require("../automation/leadAutomation");
-const auth = require("../middleware/auth"); // if exists
+
 // ================= UPLOAD PATH =================
 const uploadDir = path.join(__dirname, "../uploads");
 
@@ -43,7 +43,7 @@ const getCompanyFilter = (req) => {
 };
 
 // ================= GET ALL =================
-router.get("/", auth, async (req, res) => {
+router.get("/", async (req,res)=>{
   try {
     const user = getUser(req);
 
@@ -71,10 +71,9 @@ router.get("/", auth, async (req, res) => {
 
 // ================= CREATE =================
 router.post(
-  "/",
-  auth,
-  upload.single("file"),
-  async (req, res) => {
+"/",
+upload.single("file"),
+async (req,res)=>{
   try {
     const user = getUser(req);
 
@@ -110,10 +109,9 @@ router.post(
 });
 // ================= UPDATE =================
 router.put(
-  "/:id",
-  auth,
-  upload.single("file"),
-  async (req, res) => {
+"/:id",
+upload.single("file"),
+async (req,res)=>{
   try {
     const user = getUser(req);
 
@@ -151,7 +149,7 @@ router.put(
 
 // ================= STATUS UPDATE =================
 
-router.put("/:id/status", auth, async (req,res)=>{
+router.put("/:id/status", async (req,res)=>{
 
   console.log("STATUS ROUTE HIT");
   console.log("LEAD ID:", req.params.id);
@@ -219,7 +217,7 @@ router.put("/:id/status", auth, async (req,res)=>{
 });
 
 // ================= ASSIGN USER =================
-router.put("/:id/assign", auth, async (req,res)=>{
+router.put("/:id/assign", async (req,res)=>{
   try {
     const user = getUser(req);
 
@@ -257,7 +255,7 @@ router.put("/:id/assign", auth, async (req,res)=>{
   }
 });
 // ================= DELETE =================
-router.delete("/:id", auth, async (req,res)=>{
+router.delete("/:id", async (req,res)=>{
   try {
     const user = getUser(req);
 
@@ -291,7 +289,7 @@ router.delete("/:id", auth, async (req,res)=>{
   }
 });
 // ================= FILE PREVIEW =================
-router.get("/file/:filename", auth, (req, res) => {
+router.get("/file/:filename", (req,res)=>{
   const filePath = path.join(__dirname, "../uploads", req.params.filename);
 
   if (!fs.existsSync(filePath)) {
@@ -303,9 +301,8 @@ router.get("/file/:filename", auth, (req, res) => {
 
 // ================= FILE DOWNLOAD =================
 router.get(
-  "/file/:filename/download",
-  auth,
-  (req, res) => {
+"/file/:filename/download",
+(req,res)=>{
   const filePath = path.join(__dirname, "../uploads", req.params.filename);
 
   if (!fs.existsSync(filePath)) {
@@ -315,7 +312,7 @@ router.get(
   res.download(filePath);
 });
 // ================= EXPORT EXCEL =================
-router.get("/export", auth, async (req, res) => {
+router.get("/export", async (req,res)=>{
   try {
     const user = getUser(req); // ✅ IMPORTANT
 
@@ -359,7 +356,7 @@ router.get("/export", auth, async (req, res) => {
   }
 });
 // ================= ADD NOTE =================
-router.post("/:id/notes", auth, async (req,res)=>{
+router.post("/:id/notes", async (req,res)=>{
   const user = getUser(req);
 
   try {
@@ -416,7 +413,7 @@ router.post("/:id/notes", auth, async (req,res)=>{
 });
 
 // ================= GET NOTES =================
-router.get("/:id/notes", auth, async (req,res)=>{
+router.get("/:id/notes", async (req,res)=>{
   const user = getUser(req);
 
   try {
