@@ -351,6 +351,17 @@ router.post("/whatsapp/send-message", auth, async (req, res) => {
     res.status(500).json({ success: false });
   }
 });
+router.get("/test-whatsapp", async (req,res)=>{
+
+const result =
+await sendWhatsAppMessage(
+"7020382130",
+"CRM Test Message"
+);
+
+res.json(result);
+
+});
 // ================= EMAIL =================
 const sendEmail = require("./services/emailService");
 
@@ -379,6 +390,17 @@ router.post("/email/send", auth, async (req, res) => {
   message: err.message 
 });
   }
+});
+router.get("/test-email", async (req,res)=>{
+
+const result = await sendEmail(
+"rahul007londhe@gmail.com",
+"CRM Test",
+"Email Working"
+);
+
+res.json(result);
+
 });
 // ================= AUTH =================
 router.post(

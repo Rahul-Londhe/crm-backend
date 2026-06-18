@@ -1,5 +1,7 @@
 const twilio = require("twilio");
-
+console.log("SID:", process.env.TWILIO_SID);
+console.log("TOKEN:", process.env.TWILIO_AUTH_TOKEN);
+console.log("FROM:", process.env.TWILIO_WHATSAPP_NUMBER);
 const client = twilio(
   process.env.TWILIO_SID,
   process.env.TWILIO_AUTH_TOKEN

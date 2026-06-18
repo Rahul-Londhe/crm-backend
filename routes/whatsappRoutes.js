@@ -6,9 +6,25 @@ router.post("/send", async (req, res) => {
   try {
     const { phone, message } = req.body;
 
-    await sendWhatsAppMessage(phone, message || "Hello from CRM");
+    const result =
+await sendWhatsAppMessage(
+phone,
+message
+);
 
-    res.json({ success: true });
+if(!result.success){
+
+return res.status(500).json({
+success:false,
+message:result.message
+});
+
+}
+
+res.json({
+success:true,
+message:"WhatsApp sent"
+});
   } catch (error) {
     res.status(500).json({ success: false });
   }
