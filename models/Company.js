@@ -26,7 +26,25 @@ const companySchema = new mongoose.Schema(
     trim: true,
     default: ""
   },
+smtpEmail: {
+ type: String,
+ default: ""
+},
 
+smtpPassword: {
+ type: String,
+ default: ""
+},
+
+smtpHost: {
+ type: String,
+ default: "smtp.gmail.com"
+},
+
+smtpPort: {
+ type: Number,
+ default: 587
+},
   address: {
     type: String,
     default: ""
@@ -63,6 +81,7 @@ const companySchema = new mongoose.Schema(
     default: true
   }
 },
+
 {
   timestamps: true
 }

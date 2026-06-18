@@ -367,41 +367,84 @@ const sendEmail = require("./services/emailService");
 
 router.post("/email/send", auth, async (req, res) => {
   try {
+
     const { email, subject, message } = req.body;
 
-    const success = await sendEmail(email, subject, message);
+    const company =
+      await Company.findById(
+        req.user.companyId
+      );
 
-    if (success) {
-      return res.json({
-        success: true,
-        message: "Email sent successfully"
-      });
-    } else {
-      return res.status(500).json({
-        success: false,
-        message: "Email failed"
-      });
-    }
+    const finalMessage = `
 
-  } catch (err) {
-    console.error("EMAIL ERROR:", err);
-    res.status(500).json({ 
-  success: false, 
-  message: err.message 
-});
-  }
-});
-router.get("/test-email", async (req,res)=>{
+${company.name}
 
-const result = await sendEmail(
-"rahul007londhe@gmail.com",
-"CRM Test",
-"Email Working"
+${message}
+
+------------------------
+
+Contact Number:
+${company.phone}
+
+Email:
+${company.email}
+
+Thank You
+
+${company.name}
+
+`;
+
+    const success =
+await sendEmail(
+ email,
+ subject,
+ finalMessage,
+ company.email
 );
 
-res.json(result);
+    if (success) {
 
+      return res.json({
+        success: true,
+        message: "Email Sent"
+      });
+
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Email Failed"
+    });
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
 });
+router.get(
+  "/test-email",
+  async (req,res)=>{
+
+    const result =
+      await sendEmail(
+        "rahulanillondhe@gmail.com",
+        "CRM Test",
+        "Email Working"
+      );
+
+    res.json({
+      success: result
+    });
+
+  }
+);
 // ================= AUTH =================
 router.post(
 "/auth/register",

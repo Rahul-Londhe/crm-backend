@@ -1,33 +1,62 @@
 const nodemailer = require("nodemailer");
 
-console.log("ENV USER:", process.env.SMTP_USER);
-console.log("ENV PASS:", process.env.SMTP_PASS ? "Loaded ✅" : "Missing ❌");
+console.log("SMTP USER:", process.env.SMTP_USER);
+console.log(
+  "SMTP PASS:",
+  process.env.SMTP_PASS ? "Loaded ✅" : "Missing ❌"
+);
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+
+  service: "gmail",
 
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   }
+
 });
 
-const sendEmail = async (to, subject, message) => {
-  try {
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to,
-      subject,
-      text: message
-    });
+const sendEmail = async (
+  to,
+  subject,
+  message,
+  replyTo = null
+) => {
 
-    console.log("✅ Email Sent:", info.response);
+  try {
+
+    const mailOptions = {
+
+      from: `"CRM System" <${process.env.SMTP_USER}>`,
+
+      to,
+
+      subject,
+
+      text: message,
+
+      replyTo: replyTo || process.env.SMTP_USER
+
+    };
+
+    const info =
+      await transporter.sendMail(mailOptions);
+
+    console.log(
+      "✅ EMAIL SENT:",
+      info.messageId
+    );
+
     return true;
 
   } catch (error) {
-    console.log("❌ EMAIL ERROR:", error);
+
+    console.log(
+      "❌ EMAIL ERROR:",
+      error.message
+    );
+
     return false;
   }
 };
