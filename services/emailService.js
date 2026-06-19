@@ -39,7 +39,8 @@ const sendEmail = async (
       replyTo: replyTo || process.env.SMTP_USER
 
     };
-
+await transporter.verify();
+console.log("SMTP VERIFIED ✅");
     const info =
       await transporter.sendMail(mailOptions);
 
