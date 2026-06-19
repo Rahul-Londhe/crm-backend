@@ -428,23 +428,23 @@ await sendEmail(
 
   }
 });
-router.get(
-  "/test-email",
-  async (req,res)=>{
+router.get("/test-email", async (req, res) => {
 
-    const result =
-      await sendEmail(
-        "rahulanillondhe@gmail.com",
-        "CRM Test",
-        "Email Working"
-      );
+  console.log("TEST EMAIL START");
 
-    res.json({
-      success: result
-    });
+  const result = await sendEmail(
+    "rahulanillondhe@gmail.com",
+    "CRM Test",
+    "Email Working"
+  );
 
-  }
-);
+  console.log("TEST EMAIL RESULT:", result);
+
+  res.json({
+    success: result
+  });
+
+});
 // ================= AUTH =================
 router.post(
 "/auth/register",

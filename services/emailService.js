@@ -53,13 +53,12 @@ console.log("SMTP VERIFIED ✅");
 
   } catch (error) {
 
-    console.log(
-      "❌ EMAIL ERROR:",
-      error.message
-    );
+  console.log("EMAIL FULL ERROR:");
+  console.log(error);
 
-    return false;
-  }
+  return false;
+
+}
 };
 
 module.exports = sendEmail;
