@@ -1,53 +1,48 @@
-const express = require("express")
-const router = express.Router()
-const twilio = require("twilio")
+const twilio = require("twilio");
+
+console.log("SID:", process.env.TWILIO_SID);
+console.log("FROM:", process.env.TWILIO_WHATSAPP_NUMBER);
 
 const client = twilio(
-process.env.TWILIO_SID,
-process.env.TWILIO_AUTH_TOKEN
-)
+  process.env.TWILIO_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
-router.post("/", async (req,res)=>{
+const sendWhatsApp = async (phone, message) => {
+  try {
 
-try{
+    if (!phone || !message) {
+      throw new Error("Phone or message missing");
+    }
 
-const {phone,message} = req.body
+    let formattedPhone = phone.toString().replace(/\D/g, "");
 
-if(!phone || !message){
+    if (formattedPhone.length === 10) {
+      formattedPhone = "91" + formattedPhone;
+    }
 
-return res.status(400).json({
-success:false,
-message:"Phone and message required"
-})
+    const result = await client.messages.create({
+      from: process.env.TWILIO_WHATSAPP_NUMBER,
+      to: `whatsapp:+${formattedPhone}`,
+      body: message
+    });
 
-}
+    console.log("✅ WhatsApp Sent:", result.sid);
 
-await client.messages.create({
+    return {
+      success: true,
+      sid: result.sid
+    };
 
-from: process.env.TWILIO_WHATSAPP_NUMBER,
+  } catch (error) {
 
-to: `whatsapp:+${phone}`,
+    console.log("❌ WhatsApp Error:", error.message);
 
-body: message
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
 
-})
-
-res.json({
-success:true,
-message:"WhatsApp sent successfully"
-})
-
-}catch(err){
-
-console.log(err)
-
-res.status(500).json({
-success:false,
-error:err.message
-})
-
-}
-
-})
-
-module.exports = router
+module.exports = sendWhatsApp;

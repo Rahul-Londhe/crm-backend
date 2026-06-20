@@ -1,86 +1,158 @@
 const Lead = require("../models/Lead");
 const Task = require("../models/Task");
 
-// ✅ FIXED PATH
-const sendEmail = require("../utils/sendEmail.js");
-const sendWhatsApp = require("../utils/sendWhatsApp.js");
+const sendEmail = require("../utils/sendEmail");
+const sendWhatsApp = require("../utils/sendWhatsApp");
 
 const Settings = require("../models/Settings");
 
 const autoFollowup = async () => {
+
   try {
 
-    const settings = await Settings.findOne();
+    const settingsList =
+      await Settings.find({
+        autoFollowupEnabled: true
+      });
 
-    // ✅ Safe check
-    if (!settings || !settings.autoFollowupEnabled) {
-      console.log("⛔ Auto Follow-up OFF");
-      return;
-    }
+    for (const settings of settingsList) {
 
-    // ✅ Only unprocessed leads
-    const leads = await Lead.find({ autoFollowed: false });
+      const leads =
+        await Lead.find({
+          companyId: settings.companyId,
+          autoFollowed: false
+        });
 
-    for (let lead of leads) {
+      for (const lead of leads) {
 
-      const score = lead.score || 0;
+        const score = lead.score || 0;
 
-      // ---------------- HIGH ----------------
-      if (score >= 80) {
-        try {
-          if (lead.phone) {
+        // ================= HOT =================
+
+        if (score >= 80) {
+
+          if (
+            lead.phone &&
+            settings.whatsappAuto
+          ) {
+
+            let msg =
+              settings.hotLeadWhatsappTemplate ||
+              "Hi {{name}}, Thank you for contacting us.";
+
+            msg = msg
+              .replace(
+                /{{name}}/g,
+                lead.name || "Customer"
+              )
+              .replace(
+                /{{company}}/g,
+                settings.companyName || "Company"
+              );
+
             await sendWhatsApp(
               lead.phone,
-              `Hi ${lead.name}, we would like to connect with you!`
+              msg
             );
           }
-        } catch (err) {
-          console.log("WhatsApp Error:", err.message);
         }
-      }
 
-      // ---------------- MEDIUM ----------------
-      else if (score >= 40) {
-        try {
+        // ================= WARM =================
+
+        else if (score >= 40) {
+
+          if (
+            lead.phone &&
+            settings.whatsappAuto
+          ) {
+
+            let msg =
+              settings.warmLeadWhatsappTemplate ||
+              "Hi {{name}}, Thank you for your enquiry.";
+
+            msg = msg
+              .replace(
+                /{{name}}/g,
+                lead.name || "Customer"
+              )
+              .replace(
+                /{{company}}/g,
+                settings.companyName || "Company"
+              );
+
+            await sendWhatsApp(
+              lead.phone,
+              msg
+            );
+          }
+
           await Task.create({
-            title: `Follow up with ${lead.name}`,
+
+            title:
+              `Follow up with ${lead.name}`,
+
             lead: lead._id,
 
-            // 🔥 IMPORTANT FIX
-            user: lead.assignedTo || null,
+            user:
+              lead.assignedTo || null,
 
-            // ✅ FIXED STATUS
             status: "Pending"
-          });
-        } catch (err) {
-          console.log("Task Error:", err.message);
-        }
-      }
 
-      // ---------------- LOW ----------------
-      else {
-        try {
-          if (lead.email) {
+          });
+        }
+
+        // ================= COLD =================
+
+        else {
+
+          if (
+            lead.email &&
+            settings.emailAuto
+          ) {
+
+            let subject =
+              settings.coldLeadEmailSubject ||
+              "Thank You";
+
+            let body =
+              settings.coldLeadEmailTemplate ||
+              "Thank you for contacting us";
+
+            body = body
+              .replace(
+                /{{name}}/g,
+                lead.name || "Customer"
+              )
+              .replace(
+                /{{company}}/g,
+                settings.companyName || "Company"
+              );
+
             await sendEmail(
               lead.email,
-              "We will contact you soon",
-              "Thanks for your interest"
+              subject,
+              body
             );
           }
-        } catch (err) {
-          console.log("Email Error:", err.message);
         }
-      }
 
-      // ✅ Mark processed
-      lead.autoFollowed = true;
-      await lead.save();
+        lead.autoFollowed = true;
+
+        await lead.save();
+
+      }
     }
 
-    console.log("✅ Auto Follow-up Done");
+    console.log(
+      "✅ Auto Followup Completed"
+    );
 
   } catch (err) {
-    console.log("❌ AutoFollowup Error:", err.message);
+
+    console.log(
+      "❌ Auto Followup Error:",
+      err.message
+    );
   }
 };
 

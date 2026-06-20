@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
-const settingsSchema = new mongoose.Schema({
-
+const settingsSchema = new mongoose.Schema(
+{
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Company",
@@ -52,13 +52,66 @@ const settingsSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-autoFollowupEnabled: {
-  type: Boolean,
-  default: true
+
+  autoFollowupEnabled: {
+    type: Boolean,
+    default: true
+  },
+
+  // ==========================
+  // WhatsApp Templates
+  // ==========================
+
+  hotLeadWhatsappTemplate: {
+    type: String,
+    default:
+`Hello {{name}},
+
+Thank you for your interest.
+
+Our team will contact you shortly.
+
+Regards,
+{{company}}`
+  },
+
+  warmLeadWhatsappTemplate: {
+    type: String,
+    default:
+`Hello {{name}},
+
+Thank you for connecting with us.
+
+Regards,
+{{company}}`
+  },
+
+  // ==========================
+  // Email Templates
+  // ==========================
+
+  coldLeadEmailSubject: {
+    type: String,
+    default: "Thank You For Contacting Us"
+  },
+
+  coldLeadEmailTemplate: {
+    type: String,
+    default:
+`Hello {{name}},
+
+Thank you for contacting us.
+
+Our team will get back to you shortly.
+
+Regards,
+{{company}}`
+  }
 },
-}, {
+{
   timestamps: true
-});
+}
+);
 
 module.exports =
 mongoose.models.Settings ||
