@@ -1,7 +1,10 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -9,10 +12,11 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendEmail = async (to, subject, message) => {
+
   try {
 
     const info = await transporter.sendMail({
-      from: `"CRM System" <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_USER,
       to,
       subject,
       text: message
@@ -20,15 +24,22 @@ const sendEmail = async (to, subject, message) => {
 
     console.log("✅ Email Sent:", info.messageId);
 
-    return true;
+    return {
+      success: true,
+      messageId: info.messageId
+    };
 
-  } catch (error) {
+  } catch (err) {
 
-    console.log("❌ Email Error:", error.message);
+    console.log("❌ FULL EMAIL ERROR:", err);
 
-    return false;
+    return {
+      success: false,
+      error: err.message
+    };
 
   }
+
 };
 
 module.exports = sendEmail;

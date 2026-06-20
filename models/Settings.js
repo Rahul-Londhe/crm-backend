@@ -69,6 +69,10 @@ const settingsSchema = new mongoose.Schema(
 
 Thank you for your interest.
 
+Company: {{company}}
+Mobile: {{phone}}
+Email: {{email}}
+
 Our team will contact you shortly.
 
 Regards,
@@ -81,6 +85,10 @@ Regards,
 `Hello {{name}},
 
 Thank you for connecting with us.
+
+Company: {{company}}
+Mobile: {{phone}}
+Email: {{email}}
 
 Regards,
 {{company}}`
@@ -101,6 +109,10 @@ Regards,
 `Hello {{name}},
 
 Thank you for contacting us.
+
+Company: {{company}}
+Mobile: {{phone}}
+Email: {{email}}
 
 Our team will get back to you shortly.
 

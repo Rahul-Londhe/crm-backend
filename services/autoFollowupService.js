@@ -40,15 +40,12 @@ const autoFollowup = async () => {
               settings.hotLeadWhatsappTemplate ||
               "Hi {{name}}, Thank you for contacting us.";
 
-            msg = msg
-              .replace(
-                /{{name}}/g,
-                lead.name || "Customer"
-              )
-              .replace(
-                /{{company}}/g,
-                settings.companyName || "Company"
-              );
+   msg = msg
+  .replace(/{{name}}/g, lead.name || "Customer")
+  .replace(/{{company}}/g, settings.companyName || "Company")
+  .replace(/{{phone}}/g, settings.companyPhone || "")
+  .replace(/{{email}}/g, settings.companyEmail || "");
+
 
             await sendWhatsApp(
               lead.phone,
@@ -71,14 +68,10 @@ const autoFollowup = async () => {
               "Hi {{name}}, Thank you for your enquiry.";
 
             msg = msg
-              .replace(
-                /{{name}}/g,
-                lead.name || "Customer"
-              )
-              .replace(
-                /{{company}}/g,
-                settings.companyName || "Company"
-              );
+  .replace(/{{name}}/g, lead.name || "Customer")
+  .replace(/{{company}}/g, settings.companyName || "Company")
+  .replace(/{{phone}}/g, settings.companyPhone || "")
+  .replace(/{{email}}/g, settings.companyEmail || "");
 
             await sendWhatsApp(
               lead.phone,
@@ -111,22 +104,32 @@ const autoFollowup = async () => {
           ) {
 
             let subject =
-              settings.coldLeadEmailSubject ||
-              "Thank You";
-
+(settings.coldLeadEmailSubject || "Thank You")
+.replace(
+  /{{company}}/g,
+  settings.companyName || "Company"
+);
             let body =
               settings.coldLeadEmailTemplate ||
               "Thank you for contacting us";
 
             body = body
-              .replace(
-                /{{name}}/g,
-                lead.name || "Customer"
-              )
-              .replace(
-                /{{company}}/g,
-                settings.companyName || "Company"
-              );
+  .replace(
+    /{{name}}/g,
+    lead.name || "Customer"
+  )
+  .replace(
+    /{{company}}/g,
+    settings.companyName || "Company"
+  )
+  .replace(
+    /{{phone}}/g,
+    settings.companyPhone || ""
+  )
+  .replace(
+    /{{email}}/g,
+    settings.companyEmail || ""
+  );
 
             await sendEmail(
               lead.email,
